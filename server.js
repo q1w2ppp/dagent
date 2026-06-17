@@ -27,21 +27,12 @@ async function askDeepSeek(system,msg,chatId){
     const r=https.request({hostname:'api.deepseek.com',path:'/v1/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+DEEPSEEK_KEY,'Content-Length':Buffer.byteLength(body)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{const j=JSON.parse(d);const ans=j.choices[0].message.content;h.push({role:'assistant',content:ans});if(h.length>16)h.splice(0,2);resolve(ans)}catch(e){reject(e)}})});r.on('error',reject);r.write(body);r.end()
   });
 }
-async function analyzeImage(imageBase64,query){
-  return new Promise(async(resolve,reject)=>{
+async function analyzeImage(imageBase64,query,mimeType){
+  mimeType=mimeType||'image/jpeg';
+  return new Promise((resolve,reject)=>{
     if(!GLM_KEY){resolve('GLM_KEY未配置');return}
-    try{
-      // Step 1: Upload image to Zhipu
-      const upBody=JSON.stringify({purpose:'file',file:imageBase64,filename:'img.jpg'});
-      const upResp=await new Promise((res,rej)=>{
-        const r=https.request({hostname:'open.bigmodel.cn',path:'/api/paas/v4/files',method:'POST',headers:{'Content-Type':'application/json','Authorization':GLM_KEY,'Content-Length':Buffer.byteLength(upBody)}},rs=>{let d='';rs.on('data',c=>d+=c);rs.on('end',()=>{try{res(JSON.parse(d))}catch(e){rej(e)}})});r.on('error',rej);r.write(upBody);r.end()
-      });
-      const fileId=upResp.id;
-      if(!fileId){resolve('文件上传失败:'+JSON.stringify(upResp).substring(0,100));return}
-      // Step 2: Call GLM-4V with file reference
-      const body=JSON.stringify({model:'glm-4.6v',messages:[{role:'user',content:[{type:'text',text:query||'分析设计作品'},{type:'image_url',image_url:{url:fileId}}]}],max_tokens:500});
-      const r=https.request({hostname:'open.bigmodel.cn',path:'/api/paas/v4/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':GLM_KEY,'Content-Length':Buffer.byteLength(body)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{const j=JSON.parse(d);resolve(j.choices?.[0]?.message?.content||('RAW:'+d.substring(0,200)))}catch(e){resolve('RAW:'+d.substring(0,200))}})});r.on('error',e=>{last.imgErr=e.message;resolve('NET:'+e.message)});r.write(body);r.end()
-    }catch(e){resolve('UP:'+e.message)}
+    const body=JSON.stringify({model:'glm-4.6v',messages:[{role:'user',content:[{type:'text',text:query||'分析设计作品'},{type:'image_url',image_url:{url:'data:'+mimeType+';base64,'+imageBase64}}]}],max_tokens:500});
+    const r=https.request({hostname:'open.bigmodel.cn',path:'/api/paas/v4/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':GLM_KEY,'Content-Length':Buffer.byteLength(body)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{const j=JSON.parse(d);resolve(j.choices?.[0]?.message?.content||('RAW:'+d.substring(0,200)))}catch(e){resolve('RAW:'+d.substring(0,200))}})});r.on('error',e=>{last.imgErr=e.message;resolve('NET:'+e.message)});r.write(body);r.end()
   });
 }
 
@@ -81,7 +72,7 @@ async function sendMsg(oid,text){
     });
   }catch(e){last.sent='TOKEN:'+e.message;throw e}
 }
-async function downloadImage(key,token){return new Promise((resolve,reject)=>{const r=https.request({hostname:'open.feishu.cn',path:'/open-apis/im/v1/images/'+key,method:'GET',headers:{'Authorization':'Bearer '+token}},res=>{const chunks=[];res.on('data',c=>chunks.push(c));res.on('end',()=>resolve(Buffer.concat(chunks).toString('base64')))});r.on('error',reject);r.end()})}
+async function downloadImage(key,token){return new Promise((resolve,reject)=>{const r=https.request({hostname:'open.feishu.cn',path:'/open-apis/im/v1/images/'+key,method:'GET',headers:{'Authorization':'Bearer '+token}},res=>{const chunks=[];const mime=res.headers['content-type']||'image/jpeg';res.on('data',c=>chunks.push(c));res.on('end',()=>resolve({data:Buffer.concat(chunks).toString('base64'),mime}))});r.on('error',reject);r.end()})}
 
 // ═══ Server ═══
 const seen=new Set();let last={};
@@ -105,7 +96,7 @@ const server=http.createServer(async(req,res)=>{
         if(seen.has(msg.message_id)){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}))}seen.add(msg.message_id);
         let text='',imgKey='';try{const c=JSON.parse(msg.content||'{}');text=c.text||'';imgKey=c.image_key||''}catch(e){}
         const oid=((ev.sender||{}).sender_id||(d.sender||{})).open_id||(d.sender||{}).open_id||'';last={et,text:!!text,img:!!imgKey,content:(msg.content||'').substring(0,200)};
-        if(imgKey&&oid){try{last.step='analyzing';const tk=await getToken();const b64=await downloadImage(imgKey,tk);const a=await analyzeImage(b64);await sendMsg(oid,a);last.step='img-ok'}catch(e){last.step='img-err:'+e.message;await sendMsg(oid,'图片分析失败：'+e.message)}}
+        if(imgKey&&oid){try{last.step='analyzing';const tk=await getToken();const img=await downloadImage(imgKey,tk);const a=await analyzeImage(img.data,'分析设计',img.mime);last.imgResult=a.substring(0,100);await sendMsg(oid,a);last.step='img-ok'}catch(e){last.step='img-err:'+e.message}}
         else if(text&&oid){try{last.step='querying';const a=await processQuery(text,oid);last.step='sending';await sendMsg(oid,a);last.step='sent'}catch(e){last.step='err:'+e.message}}
         res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({code:0}));
       }catch(e){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({code:0}))}
