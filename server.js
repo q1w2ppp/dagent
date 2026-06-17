@@ -32,7 +32,8 @@ async function analyzeImage(imageData,mimeType){
     if(!GLM_KEY){resolve('GLM_KEY未配置');return}
     try{
       // Save image locally, serve via self URL
-      const imgId='img_'+Date.now();
+      const ext=(mimeType||'image/png').split('/')[1]||'png';
+      const imgId='img_'+Date.now()+'.'+ext;
       imgCache.set(imgId,{data:imageData,mime:mimeType});
       const imgUrl='https://dagent-x8o8.onrender.com/img/'+imgId;
       const body=JSON.stringify({model:'glm-4.6v',messages:[{role:'user',content:[{type:'text',text:'请分析后面图片的设计风格、配色、排版，推荐设计师和比赛'},{type:'image_url',image_url:{url:imgUrl}}]}],max_tokens:1000});
