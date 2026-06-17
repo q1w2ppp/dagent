@@ -2,7 +2,7 @@ const http=require('http'),https=require('https');
 const PORT=process.env.PORT||9095;
 const APP_ID='cli_aab8f90110ba9cc8';
 const APP_SECRET='BBGn2cO02VNpZnAonZX8yf02Vi7X4COw';
-const DEEPSEEK_KEY='sk-45859cf6b09c4d46acc71fdad1cfc68f';
+const DEEPSEEK_KEY=process.env.DEEPSEEK_KEY||'';
 
 const KB=`# 设计知识库 · 20位设计师 · 15件作品 · 5个比赛 · 审查清单
 
@@ -106,6 +106,23 @@ const server=http.createServer(async(req,res)=>{
   
   // Health check
   if(req.method==='GET'&&req.url==='/'){res.writeHead(200);return res.end('OK')}
+
+  // API for frontend
+  if(req.method==='POST'&&req.url==='/api/chat'){
+    let body='';req.on('data',c=>body+=c);
+    req.on('end',async()=>{
+      try{
+        const data=JSON.parse(body);
+        const answer=await askDeepSeek(data.message,data.chatId||'web');
+        res.writeHead(200,{'Content-Type':'application/json'});
+        res.end(JSON.stringify({answer}));
+      }catch(e){
+        res.writeHead(500,{'Content-Type':'application/json'});
+        res.end(JSON.stringify({error:e.message}));
+      }
+    });
+    return;
+  }
 
   // Feishu event callback
   if(req.method==='POST'&&req.url==='/feishu'){
