@@ -159,11 +159,23 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='POST'&&req.url==='/feishu'){
     let body='';req.on('data',c=>body+=c);
     req.on('end',async()=>{
+      console.log('[FEISHU]',body.substring(0,400));
       try{const data=JSON.parse(body);
-        if(data.type==='url_verification'){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({challenge:data.challenge}))}
-        if(data.header?.event_type==='im.message.receive_v1'){const m=data.event.message;if(m?.message_type==='text'){const text=JSON.parse(m.content).text;const openId=data.event.sender?.sender_id?.open_id;const answer=await processQuery(text,data.event.message?.chat_id||openId);await sendMsg(openId,answer)}}
+        if(data.type==='url_verification'||data.challenge){console.log('[FEISHU] challenge');res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({challenge:data.challenge||data.token}))}
+        const h=data.header||(data.event||{}).header||{};
+        const et=h.event_type||data.type||'';
+        console.log('[FEISHU] event:',et);
+        if(et==='im.message.receive_v1'){
+          const ev=data.event||data;
+          const msg=ev.message||data.message||{};
+          let text='';
+          try{text=typeof msg.content==='string'?JSON.parse(msg.content).text:''}catch(e){}
+          const oid=ev.sender?.sender_id?.open_id||data.sender?.open_id||'';
+          console.log('[FEISHU] text:',text.substring(0,100));
+          if(text&&oid){const answer=await processQuery(text,oid);await sendMsg(oid,answer)}
+        }
         res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({code:0}));
-      }catch(e){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({code:0}))}
+      }catch(e){console.error('[FEISHU ERR]',e.message);res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({code:0}))}
     });return;
   }
   res.writeHead(404);res.end();
