@@ -33,7 +33,11 @@ async function analyzeImage(imageData,mimeType){
     if(!SF_KEY){resolve('SF_KEY未配置');return}
     try{
       // Upload to Zhipu's own image API
-      const body=JSON.stringify({model:'Qwen/Qwen3-VL-8B-Instruct',messages:[{role:'user',content:[{type:'text',text:'分析后面图片的设计风格、配色、排版，推荐设计师和比赛'},{type:'image_url',image_url:{url:'data:'+(mimeType||'image/png')+';base64,'+imageData}}]}],max_tokens:500});
+      const ext=(mimeType||'image/png').split('/')[1]||'png';
+      const imgId='img_'+Date.now()+'.'+ext;
+      imgCache.set(imgId,{data:imageData,mime:mimeType});
+      const imgUrl='https://dagent-x8o8.onrender.com/img/'+imgId;
+      const body=JSON.stringify({model:'Qwen/Qwen3-VL-8B-Instruct',messages:[{role:'user',content:[{type:'text',text:'分析后面图片的设计风格、配色、排版，推荐设计师和比赛'},{type:'image_url',image_url:{url:imgUrl}}]}],max_tokens:500});
       const r=https.request({hostname:'api.siliconflow.cn',path:'/v1/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SF_KEY,'Content-Length':Buffer.byteLength(body)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{const j=JSON.parse(d);const c=j.choices?.[0]?.message;resolve(c?.content||c?.reasoning_content||('RAW:'+d.substring(0,200)))}catch(e){resolve('RAW:'+d.substring(0,200))}})});r.on('error',e=>{last.imgErr=e.message;resolve('NET:'+e.message)});r.write(body);r.end()
     }catch(e){resolve('UP:'+e.message)}
   });
