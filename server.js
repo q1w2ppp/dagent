@@ -211,18 +211,10 @@ const server=http.createServer(async(req,res)=>{
         let imageKey='';try{imageKey=typeof msg.content==='string'?JSON.parse(msg.content).image_key:''}catch(e){}
         const oid=ev.sender?.sender_id?.open_id||data.sender?.open_id||'';
         lastEvent={time:new Date().toISOString(),et:et,text:text,hasImage:!!imageKey,imgKey:imageKey||'none',body:body.substring(0,500)};
-        if(data.type==='url_verification'||data.challenge){console.log('[FEISHU] challenge');res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({challenge:data.challenge||data.token}))}
-        const h=data.header||(data.event||{}).header||{};
-        const et=h.event_type||data.type||'';
-        console.log('[FEISHU] event:',et);
         if(et==='im.message.receive_v1'){
-          const ev=data.event||data;
           const msgId=ev.message?.message_id||data.message?.message_id||'';
           if(seenMsgs.has(msgId)){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}))}
           seenMsgs.add(msgId);if(seenMsgs.size>200)seenMsgs.clear();
-          const msg=ev.message||data.message||{};
-          let text='';
-          try{text=typeof msg.content==='string'?JSON.parse(msg.content).text:''}catch(e){}
           const oid=ev.sender?.sender_id?.open_id||data.sender?.open_id||'';
           // Handle image messages
           let imageKey='';
