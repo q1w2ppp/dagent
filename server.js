@@ -28,12 +28,20 @@ async function askDeepSeek(system,msg,chatId){
   });
 }
 async function analyzeImage(imageData,mimeType){
-  mimeType=mimeType||'image/png';
-  const imgText='![image](data:'+mimeType+';base64,'+imageData+')';
-  return new Promise((resolve,reject)=>{
+  return new Promise(async(resolve,reject)=>{
     if(!GLM_KEY){resolve('GLM_KEY未配置');return}
-    const body=JSON.stringify({model:'glm-4.6v',messages:[{role:'user',content:'请分析后面图片的设计风格、配色、排版，推荐设计师和比赛。\n'+imgText}],max_tokens:1000});
-    const r=https.request({hostname:'open.bigmodel.cn',path:'/api/paas/v4/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':GLM_KEY,'Content-Length':Buffer.byteLength(body)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{const j=JSON.parse(d);const c=j.choices?.[0]?.message;resolve(c?.content||c?.reasoning_content||('RAW:'+d.substring(0,200)))}catch(e){resolve('RAW:'+d.substring(0,200))}})});r.on('error',e=>{last.imgErr=e.message;resolve('NET:'+e.message)});r.write(body);r.end()
+    try{
+      // Upload to file.io for temp public URL
+      const buf=Buffer.from(imageData,'base64');
+      const upResp=await new Promise((res,rej)=>{
+        const r=https.request({hostname:'file.io',path:'/',method:'POST',headers:{'Content-Length':buf.length}},rs=>{let d='';rs.on('data',c=>d+=c);rs.on('end',()=>{try{res(JSON.parse(d))}catch(e){rej(e)}})});r.on('error',rej);r.write(buf);r.end()
+      });
+      const imgUrl=upResp.link;
+      if(!imgUrl){resolve('图床上传失败');return}
+      // GLM-4.6V with public URL
+      const body=JSON.stringify({model:'glm-4.6v',messages:[{role:'user',content:[{type:'text',text:'请分析后面图片的设计风格、配色、排版，推荐设计师和比赛'},{type:'image_url',image_url:{url:imgUrl}}]}],max_tokens:1000});
+      const r=https.request({hostname:'open.bigmodel.cn',path:'/api/paas/v4/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':GLM_KEY,'Content-Length':Buffer.byteLength(body)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{const j=JSON.parse(d);const c=j.choices?.[0]?.message;resolve(c?.content||c?.reasoning_content||('RAW:'+d.substring(0,200)))}catch(e){resolve('RAW:'+d.substring(0,200))}})});r.on('error',e=>{last.imgErr=e.message;resolve('NET:'+e.message)});r.write(body);r.end()
+    }catch(e){resolve('UP:'+e.message)}
   });
 }
 
