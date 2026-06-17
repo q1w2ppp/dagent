@@ -79,7 +79,7 @@ async function sendMsg(oid,text){
     });
   }catch(e){last.sent='TOKEN:'+e.message;throw e}
 }
-async function downloadImage(key,token){return new Promise((resolve,reject)=>{const r=https.request({hostname:'open.feishu.cn',path:'/open-apis/im/v1/images/'+key,method:'GET',headers:{'Authorization':'Bearer '+token}},res=>{const chunks=[];const mime=res.headers['content-type']||'image/jpeg';res.on('data',c=>chunks.push(c));res.on('end',()=>resolve({data:Buffer.concat(chunks).toString('base64'),mime}))});r.on('error',reject);r.end()})}
+async function downloadImage(key,token){return new Promise((resolve,reject)=>{const r=https.request({hostname:'open.feishu.cn',path:'/open-apis/im/v1/images/'+key,method:'GET',headers:{'Authorization':'Bearer '+token}},res=>{const chunks=[];const mime=res.headers['content-type']||'image/png';if(!mime.startsWith('image/')){let d='';res.on('data',c=>d+=c);res.on('end',()=>reject(new Error('Not an image: '+d.substring(0,100))));return}res.on('data',c=>chunks.push(c));res.on('end',()=>resolve({data:Buffer.concat(chunks).toString('base64'),mime:mime.split(';')[0].trim()}))});r.on('error',reject);r.end()})}
 
 // ═══ Server ═══
 const seen=new Set();let last={};
