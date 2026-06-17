@@ -53,10 +53,14 @@ async function processQuery(q,chatId){
   if(designers.length){ctx+=`\n${designers.length}位设计师：\n`;designers.forEach(d=>ctx+=`- ${d.name} · ${d.tags.join(' ')} · ${d.strategies.join(' ')}\n`)}
   if(intent==='compete'&&works.length){ctx+='\n比赛推荐：\n';for(const[k,c]of Object.entries(COMPS))ctx+=`- ${c.name}: ${c.w.c}%概念 ${c.w.e}%执行 ${c.w.i}%创新 · ${c.pref}\n`}
   if(intent==='critique')ctx+=`\n审查清单：${THEORY}\n`;
-  const sysBase=`你是设计评论家。你已研读以下知识库。回答任何问题都必须联系知识库中的具体设计师或作品。知识库概要：
-设计师：Paula Scher(文字即图形)、原研哉(空寂/极简/MUJI)、施德明(概念驱动/实验)、穆勒-布罗克曼(瑞士网格)、大卫卡森(解构/反设计/Ray Gun)、田中一光(传统几何化)、Tibor Kalman(社会设计/Colors杂志)、Michael Bierut(大众设计/Hillary标识)、奥托艾舍(系统图标/慕尼黑奥运)、Irma Boom(书籍/物体书)
-作品：Plastic Ocean(D&AD环保)、Muji Horizons(iF极简)、Beethoven(Red Dot几何)、Ray Gun(AIGA反设计)、Public Theater(Cannes文字即图形)、Nihon Buyo(Tokyo TDC日本传统)、Colors Race(D&AD社会议题)
-规则：1.必须引用知识库中的具体设计师名或作品名 2.不知道说不知道，不编造\n${ctx}`;
+  // Lightweight intent: skip KB for greetings
+  const isDesignQuery=!/^(你好|hi|hello|谢谢|再见|早|晚安|在吗|嗯|哦|好的)[\s!！。.]*$/i.test(q.trim())&&q.trim().length>5;
+  if(!isDesignQuery){return askDeepSeek('你是设计评论家助手，回答简洁友好，1-2句话即可。不需要引用具体设计师。',q,chatId)}
+  
+  const sysBase=`你是设计评论家。基于知识库分析。必须引用具体设计师名和作品名。知识库概要：
+设计师：Paula Scher(文字即图形/Public Theater)、原研哉(极简/空寂/MUJI)、施德明(概念驱动/实验)、穆勒-布罗克曼(瑞士网格/Beethoven)、大卫卡森(解构/Ray Gun)、田中一光(传统几何化/Nihon Buyo)、Tibor Kalman(社会设计/Colors)、Michael Bierut(大众设计/Hillary)、奥托艾舍(系统图标/慕尼黑奥运)、Irma Boom(书籍物体)
+作品：Plastic Ocean(D&AD环保)、Muji Horizons(iF极简)、Ray Gun(AIGA反设计)、Public Theater(Cannes文字即图形)、Nihon Buyo(Tokyo TDC)、Colors Race(D&AD社会议题)
+审查：网格对齐/格式塔/视觉动线/字体层级/色彩语义(致命重要建议三级)\n${ctx}`;
   return askDeepSeek(sysBase,q,chatId);
 }
 
