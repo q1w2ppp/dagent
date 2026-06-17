@@ -127,7 +127,13 @@ async function getToken(){
 }
 async function sendMsg(openId,text){
   const token=await getToken();
-  const b=JSON.stringify({receive_id:openId,msg_type:'text',content:JSON.stringify({text})});
+  // Use Feishu card message for rich UI
+  const card={
+    config:{wide_screen_mode:true},
+    header:{title:{tag:'plain_text',content:'设计智能体'},template:'purple'},
+    elements:[{tag:'div',text:{tag:'lark_md',content:text}}]
+  };
+  const b=JSON.stringify({receive_id:openId,msg_type:'interactive',content:JSON.stringify(card)});
   return new Promise((resolve,reject)=>{
     const r=https.request({hostname:'open.feishu.cn',path:'/open-apis/im/v1/messages?receive_id_type=open_id',method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'Content-Length':Buffer.byteLength(b)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>resolve())});
     r.on('error',reject);r.write(b);r.end();
