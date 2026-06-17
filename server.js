@@ -168,6 +168,7 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='OPTIONS'){res.writeHead(204);return res.end()}
   if(req.method==='GET'&&req.url==='/'){res.writeHead(200);return res.end('OK')}
   if(req.method==='GET'&&req.url==='/debug'){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({lastEvent}))}
+  if(req.method==='GET'&&req.url==='/test-gemini'){
     try{
       const result=await new Promise((resolve,reject)=>{
         const body=JSON.stringify({contents:[{parts:[{text:'say ok'}]}]});
