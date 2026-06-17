@@ -123,9 +123,11 @@ const server=http.createServer(async(req,res)=>{
       try{const d=JSON.parse(body);if(d.type==='url_verification'||d.challenge){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({challenge:d.challenge||d.token}))}
         const h=d.header||{};const et=h.event_type||'';const ev=d.event||{};const msg=ev.message||{};
         if(et==='card.action.trigger'){
-          const ev2=d.event||d;const raw=(ev2.action||d.action||{});const av=JSON.parse(raw.value||'{}');
+          const ev2=d.event||d;const raw=(ev2.action||d.action||{});let av={};
+          try{av=JSON.parse(raw.value||'{}')}catch(e){}
+          if(typeof av==='string')try{av=JSON.parse(av)}catch(e){}
           const oid2=d.open_id||(d.user||{}).open_id||(d.operator||{}).open_id||'';
-          last={et:'btn',raw:JSON.stringify(raw).substring(0,100),oid:oid2};
+          last={et:'btn',a:av.action,oid:oid2};
           if(av.action&&oid2){
             const r=await processQuery(av.action+' '+av.info,oid2);
             await sendMsg(oid2,r.answer||r,r.actions||[]);
