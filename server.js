@@ -82,7 +82,8 @@ async function downloadFeishuImage(imageKey,token){
   });
 }
 const hist=new Map();
-const seenMsgs=new Set(); // dedup Feishu messages
+const seenMsgs=new Set();
+let lastEvent='none'; // dedup Feishu messages
 function askDeepSeek(systemPrompt,userMsg,chatId){
   if(!hist.has(chatId))hist.set(chatId,[]);
   const h=hist.get(chatId);h.push({role:'user',content:userMsg});
@@ -166,7 +167,7 @@ const server=http.createServer(async(req,res)=>{
   res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','Content-Type');res.setHeader('Access-Control-Allow-Methods','POST,GET,OPTIONS');
   if(req.method==='OPTIONS'){res.writeHead(204);return res.end()}
   if(req.method==='GET'&&req.url==='/'){res.writeHead(200);return res.end('OK')}
-  if(req.method==='GET'&&req.url==='/test-gemini'){
+  if(req.method==='GET'&&req.url==='/debug'){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({lastEvent}))}
     try{
       const result=await new Promise((resolve,reject)=>{
         const body=JSON.stringify({contents:[{parts:[{text:'say ok'}]}]});
@@ -199,6 +200,7 @@ const server=http.createServer(async(req,res)=>{
     let body='';req.on('data',c=>body+=c);
     req.on('end',async()=>{
       console.log('[FEISHU]',body.substring(0,400));
+      lastEvent={time:new Date().toISOString(),type:req.body?.header?.event_type||'parsing',body:body.substring(0,500)};
       try{const data=JSON.parse(body);
         if(data.type==='url_verification'||data.challenge){console.log('[FEISHU] challenge');res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({challenge:data.challenge||data.token}))}
         const h=data.header||(data.event||{}).header||{};
