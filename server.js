@@ -2,6 +2,7 @@ const http=require('http'),https=require('https');
 const PORT=process.env.PORT||10000;
 const APP_ID='cli_aab8f90110ba9cc8',APP_SECRET='BBGn2cO02VNpZnAonZX8yf02Vi7X4COw';
 const DEEPSEEK_KEY=process.env.DEEPSEEK_KEY||'';
+const GEMINI_KEY=process.env.GEMINI_KEY||'';
 
 // ═══ Knowledge Base ═══
 const DESIGNERS=[
@@ -59,7 +60,27 @@ function scoreComps(w){
   return r.sort((a,b)=>b.score-a.score);
 }
 
-// ═══ DeepSeek API ═══
+// ═══ Gemini Vision ═══
+async function analyzeImage(imageBase64,userQuery){
+  const prompt=userQuery||'请分析这张设计作品：描述画面内容，识别设计风格，推荐2-3位风格相关的设计师（从知识库中），并给出优化建议。';
+  return new Promise((resolve,reject)=>{
+    const body=JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:imageBase64}}]}]});
+    const r=https.request({hostname:'generativelanguage.googleapis.com',path:'/v1beta/models/gemini-1.5-flash:generateContent?key='+GEMINI_KEY,method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(body)}},res=>{
+      let d='';res.on('data',c=>d+=c);res.on('end',()=>{
+        try{const j=JSON.parse(d);resolve(j.candidates?.[0]?.content?.parts?.[0]?.text||'无法分析')}catch(e){reject(e)}
+      });
+    });r.on('error',reject);r.write(body);r.end();
+  });
+}
+
+// Feishu image download
+async function downloadFeishuImage(imageKey,token){
+  return new Promise((resolve,reject)=>{
+    const r=https.request({hostname:'open.feishu.cn',path:'/open-apis/im/v1/images/'+imageKey,method:'GET',headers:{'Authorization':'Bearer '+token}},res=>{
+      const chunks=[];res.on('data',c=>chunks.push(c));res.on('end',()=>resolve(Buffer.concat(chunks).toString('base64')));
+    });r.on('error',reject);r.end();
+  });
+}
 const hist=new Map();
 const seenMsgs=new Set(); // dedup Feishu messages
 function askDeepSeek(systemPrompt,userMsg,chatId){
@@ -181,8 +202,15 @@ const server=http.createServer(async(req,res)=>{
           let text='';
           try{text=typeof msg.content==='string'?JSON.parse(msg.content).text:''}catch(e){}
           const oid=ev.sender?.sender_id?.open_id||data.sender?.open_id||'';
-          console.log('[FEISHU] text:',text.substring(0,100));
-          if(text&&oid){const answer=await processQuery(text,oid);await sendMsg(oid,answer)}
+          // Handle image messages
+          let imageKey='';
+          try{imageKey=typeof msg.content==='string'?JSON.parse(msg.content).image_key:''}catch(e){}
+          if(imageKey&&oid){
+            const token=await getToken();
+            const imgBase64=await downloadFeishuImage(imageKey,token);
+            const analysis=await analyzeImage(imgBase64,'分析设计作品');
+            await sendMsg(oid,analysis);
+          }else
         }
         res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({code:0}));
       }catch(e){console.error('[FEISHU ERR]',e.message);res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({code:0}))}
