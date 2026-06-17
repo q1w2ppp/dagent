@@ -37,7 +37,7 @@ async function analyzeImage(imageData,mimeType){
       const imgId='img_'+Date.now()+'.'+ext;
       imgCache.set(imgId,{data:imageData,mime:mimeType});
       const imgUrl='https://dagent-x8o8.onrender.com/img/'+imgId;
-      const body=JSON.stringify({model:'Qwen/Qwen3-VL-8B-Instruct',messages:[{role:'user',content:[{type:'text',text:'分析后面图片的设计风格、配色、排版，推荐设计师和比赛'},{type:'image_url',image_url:{url:imgUrl}}]}],max_tokens:500});
+      const body=JSON.stringify({model:'Qwen/Qwen3-VL-8B-Instruct',messages:[{role:'user',content:[{type:'text',text:'你是设计评论家。根据下方知识库分析此图的：1.设计风格（对标知识库中哪位设计师）2.配色方案与色彩语义 3.排版与信息层级 4.视觉策略 5.可改进点与风险。必须引用具体设计师名。知识库：20位设计师包括 Paula Scher(文字即图形/高密度)、Kenya Hara(极简/空寂)、Stefan Sagmeister(概念驱动/实验)、Josef Muller-Brockmann(瑞士国际/网格)、David Carson(解构/反设计)、Tibor Kalman(社会设计/反消费)等。15件作品参考。审查标准：网格对齐/格式塔/视觉动线/字体层级/色彩语义。'},{type:'image_url',image_url:{url:imgUrl}}]}],max_tokens:800});
       const r=https.request({hostname:'api.siliconflow.cn',path:'/v1/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SF_KEY,'Content-Length':Buffer.byteLength(body)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{const j=JSON.parse(d);const c=j.choices?.[0]?.message;resolve(c?.content||c?.reasoning_content||('RAW:'+d.substring(0,200)))}catch(e){resolve('RAW:'+d.substring(0,200))}})});r.on('error',e=>{last.imgErr=e.message;resolve('NET:'+e.message)});r.write(body);r.end()
     }catch(e){resolve('UP:'+e.message)}
   });
