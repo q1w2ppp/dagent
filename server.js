@@ -31,13 +31,19 @@ async function analyzeImage(imageData,mimeType){
   return new Promise(async(resolve,reject)=>{
     if(!GLM_KEY){resolve('GLM_KEY未配置');return}
     try{
-      // Upload to imgbb free image host
-      const formData='image='+encodeURIComponent(imageData);
+      // Upload to free image host
+      const buf=Buffer.from(imageData,'base64');
+      const boundary='----ZhipuBoundary'+Date.now();
+      const header='--'+boundary+'\r\nContent-Disposition: form-data; name="file"; filename="img.'+(mimeType.split('/')[1]||'png')+'"\r\nContent-Type: '+mimeType+'\r\n\r\n';
+      const footer='\r\n--'+boundary+'--\r\n';
+      const multipart=Buffer.concat([Buffer.from(header),buf,Buffer.from(footer)]);
       const upResp=await new Promise((res,rej)=>{
-        const r=https.request({hostname:'api.imgbb.com',path:'/1/upload?key='+IMGBB_KEY,method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','Content-Length':Buffer.byteLength(formData)}},rs=>{let d='';rs.on('data',c=>d+=c);rs.on('end',()=>{try{res(JSON.parse(d))}catch(e){rej(e)}})});r.on('error',rej);r.write(formData);r.end()
+        const r=https.request({hostname:'pixeldrain.com',path:'/api/file',method:'POST',headers:{'Content-Type':'multipart/form-data; boundary='+boundary,'Content-Length':multipart.length}},rs=>{let d='';rs.on('data',c=>d+=c);rs.on('end',()=>{try{res(JSON.parse(d))}catch(e){rej(e)}})});r.on('error',rej);r.write(multipart);r.end()
       });
-      const imgUrl=upResp.data?.url||upResp.data?.display_url;
+      const imgUrl=upResp.url||upResp.id?'https://pixeldrain.com/api/file/'+upResp.id+'?download':null;
       if(!imgUrl){resolve('图床上传失败');return}
+      // Call GLM with pixeldrain URL
+      const body=JSON.stringify({model:'glm-4v',messages:[{role:'user',content:[{type:'text',text:'分析此设计'},{type:'image_url',image_url:{url:imgUrl}}]}],max_tokens:500});
       // Call GLM with public URL
       const body=JSON.stringify({model:'glm-4v',messages:[{role:'user',content:[{type:'text',text:'分析这张设计作品的风格、配色、排版，推荐2-3位设计师'},{type:'image_url',image_url:{url:imgUrl}}]}],max_tokens:500});
       const r=https.request({hostname:'open.bigmodel.cn',path:'/api/paas/v4/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':GLM_KEY,'Content-Length':Buffer.byteLength(body)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{const j=JSON.parse(d);resolve(j.choices?.[0]?.message?.content||('RAW:'+d.substring(0,200)))}catch(e){resolve('RAW:'+d.substring(0,200))}})});r.on('error',e=>{last.imgErr=e.message;resolve('NET:'+e.message)});r.write(body);r.end()
