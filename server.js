@@ -2,7 +2,7 @@ const http=require('http'),https=require('https');
 const PORT=process.env.PORT||10000;
 const APP_ID='cli_aab8f90110ba9cc8',APP_SECRET='BBGn2cO02VNpZnAonZX8yf02Vi7X4COw';
 const DEEPSEEK_KEY=process.env.DEEPSEEK_KEY||'';
-const GEMINI_KEY=process.env.GEMINI_KEY||'';
+const VISION_KEY=process.env.VISION_KEY||'';
 
 // ═══ Knowledge Base ═══
 const DESIGNERS=[
@@ -64,12 +64,10 @@ function scoreComps(w){
 async function analyzeImage(imageBase64,userQuery){
   const prompt=userQuery||'请分析这张设计作品：描述画面内容，识别设计风格，推荐2-3位风格相关的设计师（从知识库中），并给出优化建议。';
   return new Promise((resolve,reject)=>{
-    const body=JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:imageBase64}}]}]});
-    const r=https.request({hostname:'generativelanguage.googleapis.com',path:'/v1beta/models/gemini-1.5-flash:generateContent?key='+GEMINI_KEY,method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(body)}},res=>{
-      let d='';res.on('data',c=>d+=c);res.on('end',()=>{
-        try{const j=JSON.parse(d);resolve(j.candidates?.[0]?.content?.parts?.[0]?.text||'无法分析')}catch(e){reject(e)}
-      });
-    });r.on('error',reject);r.write(body);r.end();
+    const body=JSON.stringify({model:'Qwen/Qwen2-VL-7B-Instruct',messages:[{role:'user',content:[{type:'text',text:prompt},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+imageBase64}}]}],max_tokens:800,temperature:0.7});
+    const r=https.request({hostname:'api.siliconflow.cn',path:'/v1/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+VISION_KEY,'Content-Length':Buffer.byteLength(body)}},res=>{
+      let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{const j=JSON.parse(d);resolve(j.choices?.[0]?.message?.content||'无法分析')}catch(e){resolve('无法分析')}});
+    });r.on('error',e=>reject(e));r.write(body);r.end();
   });
 }
 
@@ -168,12 +166,12 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='OPTIONS'){res.writeHead(204);return res.end()}
   if(req.method==='GET'&&req.url==='/'){res.writeHead(200);return res.end('OK')}
   if(req.method==='GET'&&req.url==='/debug'){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({lastEvent}))}
-  if(req.method==='GET'&&req.url==='/test-gemini'){
+  if(req.method==='GET'&&req.url==='/test-vision'){
     try{
       const result=await new Promise((resolve,reject)=>{
-        const body=JSON.stringify({contents:[{parts:[{text:'say ok'}]}]});
-        const r=https.request({hostname:'generativelanguage.googleapis.com',path:'/v1beta/models/gemini-2.0-flash:generateContent?key='+GEMINI_KEY,method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(body)}},res=>{
-          let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{const j=JSON.parse(d);resolve(j.candidates?.[0]?.content?.parts?.[0]?.text||d)}catch(e){resolve(d)}})
+        const body=JSON.stringify({model:'Qwen/Qwen2-VL-7B-Instruct',messages:[{role:'user',content:'say ok'}],max_tokens:20});
+        const r=https.request({hostname:'api.siliconflow.cn',path:'/v1/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+VISION_KEY,'Content-Length':Buffer.byteLength(body)}},res=>{
+          let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{resolve(JSON.parse(d).choices?.[0]?.message?.content||d)}catch(e){resolve(d)}})
         });r.on('error',e=>resolve('NET:'+e.message));r.write(body);r.end();
       });
       res.writeHead(200,{'Content-Type':'text/plain'});res.end(result);
