@@ -111,6 +111,7 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='POST'&&req.url==='/feishu'){
     let body='';req.on('data',c=>body+=c);
     req.on('end',async()=>{
+      console.log('[FEISHU]',body.substring(0,200));
       try{
         const data=JSON.parse(body);
         // URL verification challenge
