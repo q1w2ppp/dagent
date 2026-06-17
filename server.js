@@ -64,7 +64,10 @@ const seen=new Set();let last={};
 const server=http.createServer(async(req,res)=>{
   res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','Content-Type');
   if(req.method==='OPTIONS'){res.writeHead(204);return res.end()}
-  if(req.method==='GET'&&req.url==='/'){res.writeHead(200);return res.end('OK')}
+  if(req.method==='GET'&&req.url==='/test-send'){
+    try{await sendMsg('ou_b88be4a4e6b6939cfbbc95feacfea648','测试消息-来自服务器');res.writeHead(200);res.end('sent')}catch(e){res.writeHead(500);res.end('fail:'+e.message)}
+    return;
+  }
   if(req.method==='GET'&&req.url==='/debug'){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify(last))}
   
   if(req.method==='POST'&&req.url==='/api/chat'){
