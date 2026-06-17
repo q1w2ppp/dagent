@@ -85,7 +85,7 @@ async function sendMsg(oid,text,actions){
   try{
     const token=await getToken();
     const elements=[{tag:'div',text:{tag:'lark_md',content:text}}];
-    if(actions&&actions.length)elements.push({tag:'action',actions:actions.map(a=>({tag:'button',text:{tag:'plain_text',content:a.label},type:a.type||'primary',multi_url:{url:'https://q1w2ppp.github.io/web-sentinel/design-agent.html?q='+encodeURIComponent(a.value.action+' '+a.value.info),pc_url:'https://q1w2ppp.github.io/web-sentinel/design-agent.html?q='+encodeURIComponent(a.value.action+' '+a.value.info)}}))});
+    if(actions&&actions.length)elements.push({tag:'action',actions:actions.map(a=>({tag:'button',text:{tag:'plain_text',content:a.label},type:a.type||'primary',value:JSON.stringify(a.value)}))});
     const b=JSON.stringify({receive_id:oid,msg_type:'interactive',content:JSON.stringify({config:{wide_screen_mode:true},header:{title:{tag:'plain_text',content:'Design Agent'},template:'wathet'},elements})});
     return new Promise((resolve,reject)=>{
       const r=https.request({hostname:'open.feishu.cn',path:'/open-apis/im/v1/messages?receive_id_type=open_id',method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'Content-Length':Buffer.byteLength(b)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{last.sent=d;resolve()})});
