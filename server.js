@@ -126,8 +126,8 @@ const server=http.createServer(async(req,res)=>{
           const ev2=d.event||d;const raw=(ev2.action||d.action||{});let av={};
           try{av=JSON.parse(raw.value||'{}')}catch(e){}
           if(typeof av==='string')try{av=JSON.parse(av)}catch(e){}
-          const oid2=d.open_id||(d.user||{}).open_id||(d.operator||{}).open_id||(ev2.operator||{}).open_id||lastOid;
-          last={et:'btn',a:av.action,oid:oid2};
+          const oid2=d.open_id||d.user_id||d.operator_id||(d.user||{}).open_id||(d.operator||{}).open_id||(ev2.operator||{}).open_id||lastOid;
+          last={et:'btn',a:av.action,oid:oid2,keys:Object.keys(ev2).slice(0,10).join(',')};
           if(av.action&&oid2){
             const r=await processQuery(av.action+' '+av.info,oid2);
             await sendMsg(oid2,r.answer||r,r.actions||[]);
