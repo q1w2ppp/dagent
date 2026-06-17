@@ -47,7 +47,16 @@ async function processQuery(q,chatId){
 
 // ═══ Feishu Helpers ═══
 async function getToken(){return new Promise((resolve,reject)=>{const b=JSON.stringify({app_id:APP_ID,app_secret:APP_SECRET});const r=https.request({hostname:'open.feishu.cn',path:'/open-apis/auth/v3/tenant_access_token/internal',method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(b)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{resolve(JSON.parse(d).tenant_access_token)}catch(e){reject(e)}})});r.on('error',reject);r.write(b);r.end()})}
-async function sendMsg(oid,text){const token=await getToken();const b=JSON.stringify({receive_id:oid,msg_type:'text',content:JSON.stringify({text})});return new Promise((resolve,reject)=>{const r=https.request({hostname:'open.feishu.cn',path:'/open-apis/im/v1/messages?receive_id_type=open_id',method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'Content-Length':Buffer.byteLength(b)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>resolve())});r.on('error',reject);r.write(b);r.end()})}
+async function sendMsg(oid,text){
+  try{
+    const token=await getToken();
+    const b=JSON.stringify({receive_id:oid,msg_type:'text',content:JSON.stringify({text})});
+    return new Promise((resolve,reject)=>{
+      const r=https.request({hostname:'open.feishu.cn',path:'/open-apis/im/v1/messages?receive_id_type=open_id',method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'Content-Length':Buffer.byteLength(b)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{last.sent=d;resolve()})});
+      r.on('error',e=>{last.sent='NET:'+e.message;reject(e)});r.write(b);r.end();
+    });
+  }catch(e){last.sent='TOKEN:'+e.message;throw e}
+}
 async function downloadImage(key,token){return new Promise((resolve,reject)=>{const r=https.request({hostname:'open.feishu.cn',path:'/open-apis/im/v1/images/'+key,method:'GET',headers:{'Authorization':'Bearer '+token}},res=>{const chunks=[];res.on('data',c=>chunks.push(c));res.on('end',()=>resolve(Buffer.concat(chunks).toString('base64')))});r.on('error',reject);r.end()})}
 
 // ═══ Server ═══
