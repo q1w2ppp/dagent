@@ -210,7 +210,9 @@ const server=http.createServer(async(req,res)=>{
             const imgBase64=await downloadFeishuImage(imageKey,token);
             const analysis=await analyzeImage(imgBase64,'分析设计作品');
             await sendMsg(oid,analysis);
-          }else
+          }else if(text&&oid){
+            const answer=await processQuery(text,oid);await sendMsg(oid,answer);
+          }
         }
         res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({code:0}));
       }catch(e){console.error('[FEISHU ERR]',e.message);res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({code:0}))}
