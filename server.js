@@ -98,7 +98,7 @@ async function serveImage(imageData,mimeType){const ext=(mimeType||'image/png').
 async function describeImage(imgUrl){return new Promise((resolve)=>{const body=JSON.stringify({model:'Qwen/Qwen3-VL-8B-Instruct',messages:[{role:'user',content:[{type:'text',text:'详细描述这张图片的画面内容、视觉风格、配色、排版布局。150-300字。只客观描述不评价。'},{type:'image_url',image_url:{url:imgUrl}}]}],max_tokens:400});const r=https.request({hostname:'api.siliconflow.cn',path:'/v1/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SF_KEY,'Content-Length':Buffer.byteLength(body)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{resolve(JSON.parse(d).choices?.[0]?.message?.content||'')}catch(e){resolve('')}})});r.on('error',()=>resolve(''));r.write(body);r.end()})}
 
 // ═══ Server ═══
-const seen=new Set();let last={};
+const seen=new Set();let last={},lastOid='';
 const imgCache=new Map();
 const server=http.createServer(async(req,res)=>{
   res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','Content-Type');
@@ -126,7 +126,7 @@ const server=http.createServer(async(req,res)=>{
           const ev2=d.event||d;const raw=(ev2.action||d.action||{});let av={};
           try{av=JSON.parse(raw.value||'{}')}catch(e){}
           if(typeof av==='string')try{av=JSON.parse(av)}catch(e){}
-          const oid2=d.open_id||(d.user||{}).open_id||(d.operator||{}).open_id||(ev2.operator||{}).open_id||'';
+          const oid2=d.open_id||(d.user||{}).open_id||(d.operator||{}).open_id||(ev2.operator||{}).open_id||lastOid;
           last={et:'btn',a:av.action,oid:oid2};
           if(av.action&&oid2){
             const r=await processQuery(av.action+' '+av.info,oid2);
@@ -137,7 +137,7 @@ const server=http.createServer(async(req,res)=>{
         if(et!=='im.message.receive_v1'){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}))}
         if(seen.has(msg.message_id)){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}))}seen.add(msg.message_id);
         let text='',imgKey='';try{const c=JSON.parse(msg.content||'{}');text=c.text||'';imgKey=c.image_key||''}catch(e){}
-        const oid=((ev.sender||{}).sender_id||(d.sender||{})).open_id||(d.sender||{}).open_id||'';last={et,text:!!text,img:!!imgKey,content:(msg.content||'').substring(0,200)};
+        const oid=((ev.sender||{}).sender_id||(d.sender||{})).open_id||(d.sender||{}).open_id||'';if(oid)lastOid=oid;last={et,text:!!text,img:!!imgKey,content:(msg.content||'').substring(0,200)};
         if(imgKey&&oid){try{last.step='dl';const tk=await getToken();const msgId=msg.message_id||'';const img=await downloadFeishuFile(msgId,imgKey,tk);last.step='got-'+img.data.length;const imgUrl=await serveImage(img.data,img.mime);last.step='url';const desc=await describeImage(imgUrl);last.step='desc';const r=await processQuery('请对这张设计作品进行分析：'+desc,oid);const a=r.answer||r;const acts=r.actions||[];last.imgResult=a.substring(0,100);await sendMsg(oid,a,acts);last.step='ok'}catch(e){last.imgResult='ERR:'+e.message;last.step='fail';await sendMsg(oid,'错误:'+e.message)}}
         else if(text&&oid){try{last.step='querying';const r=await processQuery(text,oid);const a=r.answer||r;const acts=r.actions||[];last.step='sending';await sendMsg(oid,a,acts);last.step='sent'}catch(e){last.step='err:'+e.message}}
         res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({code:0}));
