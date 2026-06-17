@@ -28,8 +28,9 @@ async function askDeepSeek(system,msg,chatId){
 }
 async function analyzeImage(imageBase64,query){
   return new Promise((resolve,reject)=>{
+    if(!OPENAI_KEY){resolve('OPENAI_KEY未配置');return}
     const body=JSON.stringify({model:'gpt-4o-mini',messages:[{role:'user',content:[{type:'text',text:query||'分析设计作品'},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+imageBase64}}]}],max_tokens:500});
-    const r=https.request({hostname:'api.openai.com',path:'/v1/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+OPENAI_KEY,'Content-Length':Buffer.byteLength(body)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{resolve(JSON.parse(d).choices?.[0]?.message?.content||'无法分析')}catch(e){resolve('无法分析')}})});r.on('error',e=>reject(e));r.write(body);r.end()
+    const r=https.request({hostname:'api.openai.com',path:'/v1/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+OPENAI_KEY,'Content-Length':Buffer.byteLength(body)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{const j=JSON.parse(d);resolve(j.choices?.[0]?.message?.content||('RAW:'+d.substring(0,200)))}catch(e){resolve('RAW:'+d.substring(0,200))}})});r.on('error',e=>{last.imgErr=e.message;resolve('NET:'+e.message)});r.write(body);r.end()
   });
 }
 
