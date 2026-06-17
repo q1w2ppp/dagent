@@ -68,7 +68,7 @@ const server=http.createServer(async(req,res)=>{
         const h=d.header||{};const et=h.event_type||'';const ev=d.event||{};const msg=ev.message||{};if(et!=='im.message.receive_v1'){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}))}
         if(seen.has(msg.message_id)){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}))}seen.add(msg.message_id);
         let text='',imgKey='';try{const c=JSON.parse(msg.content||'{}');text=c.text||'';imgKey=c.image_key||''}catch(e){}
-        const oid=(ev.sender||{}).sender_id||(d.sender||{}).open_id||'';last={et,text:!!text,img:!!imgKey};
+        const oid=(ev.sender||{}).sender_id||(d.sender||{}).open_id||'';last={et,text:!!text,img:!!imgKey,content:(msg.content||'').substring(0,200)};
         if(imgKey&&oid){try{const tk=await getToken();const b64=await downloadImage(imgKey,tk);const a=await analyzeImage(b64,'分析这张设计作品的风格，匹配知识库设计师');await sendMsg(oid,a)}catch(e){await sendMsg(oid,'图片分析失败：'+e.message)}}
         else if(text&&oid){const a=await processQuery(text,oid);await sendMsg(oid,a)}
         res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({code:0}));
