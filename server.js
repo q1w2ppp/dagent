@@ -72,7 +72,7 @@ async function getToken(){return new Promise((resolve,reject)=>{const b=JSON.str
 async function sendMsg(oid,text){
   try{
     const token=await getToken();
-    const b=JSON.stringify({receive_id:oid,msg_type:'text',content:JSON.stringify({text})});
+    const b=JSON.stringify({receive_id:oid,msg_type:'interactive',content:JSON.stringify({config:{wide_screen_mode:true},header:{title:{tag:'plain_text',content:'Design Agent'},template:'wathet'},elements:[{tag:'div',text:{tag:'lark_md',content:text}}]})});
     return new Promise((resolve,reject)=>{
       const r=https.request({hostname:'open.feishu.cn',path:'/open-apis/im/v1/messages?receive_id_type=open_id',method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'Content-Length':Buffer.byteLength(b)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{last.sent=d;resolve()})});
       r.on('error',e=>{last.sent='NET:'+e.message;reject(e)});r.write(b);r.end();
