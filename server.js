@@ -28,23 +28,11 @@ async function askDeepSeek(system,msg,chatId){
   });
 }
 async function analyzeImage(imageData,mimeType){
-  return new Promise(async(resolve,reject)=>{
+  return new Promise((resolve,reject)=>{
     if(!GLM_KEY){resolve('GLM_KEY未配置');return}
-    try{
-      // Upload to Zhipu file system
-      const buf=Buffer.from(imageData,'base64');
-      const boundary='----boundary'+Date.now();
-      const header='--'+boundary+'\r\nContent-Disposition: form-data; name="file"; filename="img.'+(mimeType.split('/')[1]||'png')+'"\r\nContent-Type: '+mimeType+'\r\n\r\n';
-      const footer='\r\n--'+boundary+'--\r\n';
-      const multipart=Buffer.concat([Buffer.from(header),buf,Buffer.from(footer)]);
-      const upResp=await new Promise((res,rej)=>{
-        const r=https.request({hostname:'open.bigmodel.cn',path:'/api/paas/v4/files',method:'POST',headers:{'Authorization':GLM_KEY,'Content-Type':'multipart/form-data; boundary='+boundary,'Content-Length':multipart.length}},rs=>{let d='';rs.on('data',c=>d+=c);rs.on('end',()=>{try{res(JSON.parse(d))}catch(e){rej(e)}})});r.on('error',rej);r.write(multipart);r.end()
-      });
-      const fileId=upResp.id;if(!fileId){resolve('上传失败:'+JSON.stringify(upResp).substring(0,100));return}
-      // Call GLM-4V with file URL
-      const body=JSON.stringify({model:'glm-4.6v',messages:[{role:'user',content:[{type:'text',text:'分析设计作品'},{type:'image_url',image_url:{url:fileId}}]}],max_tokens:500});
-      const r=https.request({hostname:'open.bigmodel.cn',path:'/api/paas/v4/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':GLM_KEY,'Content-Length':Buffer.byteLength(body)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{const j=JSON.parse(d);resolve(j.choices?.[0]?.message?.content||('RAW:'+d.substring(0,200)))}catch(e){resolve('RAW:'+d.substring(0,200))}})});r.on('error',e=>{last.imgErr=e.message;resolve('NET:'+e.message)});r.write(body);r.end()
-    }catch(e){resolve('UP:'+e.message)}
+    const url='data:'+(mimeType||'image/png')+';base64,'+imageData;
+    const body=JSON.stringify({model:'glm-4v',messages:[{role:'user',content:[{type:'text',text:'分析这张设计作品的风格、配色、排版，推荐2-3位设计师'},{type:'image_url',image_url:{url}}]}],max_tokens:500});
+    const r=https.request({hostname:'open.bigmodel.cn',path:'/api/paas/v4/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':GLM_KEY,'Content-Length':Buffer.byteLength(body)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{const j=JSON.parse(d);resolve(j.choices?.[0]?.message?.content||('RAW:'+d.substring(0,200)))}catch(e){resolve('RAW:'+d.substring(0,200))}})});r.on('error',e=>{last.imgErr=e.message;resolve('NET:'+e.message)});r.write(body);r.end()
   });
 }
 
