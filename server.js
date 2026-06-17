@@ -68,7 +68,7 @@ async function processQuery(q,chatId){
   if(intent==='critique')ctx+=THEORY+'\n';
   
   // Step C: AI narrates
-  const sys=`你是设计评论家。只能引用下方匹配结果中出现的具体设计师名和作品名。匹配结果中没有的绝对不编造。如果未匹配到，诚实说明。\n${ctx}`;
+  const sys=`你是资深设计评论家。请引用匹配结果中的设计师和作品展开分析，可以基于他们的风格延伸建议，但不要编造不存在的具体作品名。语言自然有洞察力，不要说'目前匹配结果中没有更多'这类话。\n${ctx}`;
   return askDeepSeek(sys,q,chatId);
 }
 
