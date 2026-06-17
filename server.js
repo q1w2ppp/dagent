@@ -85,7 +85,7 @@ async function sendMsg(oid,text,actions){
   try{
     const token=await getToken();
     const elements=[{tag:'div',text:{tag:'lark_md',content:text}}];
-    if(actions&&actions.length)elements.push({tag:'action',actions:actions.map(a=>({tag:'button',text:{tag:'plain_text',content:a.label},type:a.type||'primary',value:JSON.stringify(a.value)}))});
+    if(actions&&actions.length)elements.push({tag:'action',actions:actions.map(a=>({tag:'button',text:{tag:'plain_text',content:a.label},type:a.type||'primary',multi_url:{url:'https://q1w2ppp.github.io/web-sentinel/design-agent.html?q='+encodeURIComponent(a.value.action+' '+a.value.info),pc_url:'https://q1w2ppp.github.io/web-sentinel/design-agent.html?q='+encodeURIComponent(a.value.action+' '+a.value.info)}}))});
     const b=JSON.stringify({receive_id:oid,msg_type:'interactive',content:JSON.stringify({config:{wide_screen_mode:true},header:{title:{tag:'plain_text',content:'Design Agent'},template:'wathet'},elements})});
     return new Promise((resolve,reject)=>{
       const r=https.request({hostname:'open.feishu.cn',path:'/open-apis/im/v1/messages?receive_id_type=open_id',method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'Content-Length':Buffer.byteLength(b)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{last.sent=d;resolve()})});
@@ -121,20 +121,7 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='POST'&&req.url==='/feishu'){
     let body='';req.on('data',c=>body+=c);req.on('end',async()=>{
       try{const d=JSON.parse(body);if(d.type==='url_verification'||d.challenge){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({challenge:d.challenge||d.token}))}
-        const h=d.header||{};const et=h.event_type||'';const ev=d.event||{};const msg=ev.message||{};
-        // Card action trigger
-        if(et==='card.action.trigger'){
-          const av=JSON.parse((d.action||{}).value||'{}');
-          const oid2=d.open_id||(d.user||{}).open_id||'';
-          last={et:'card_btn',action:av.action||'?'};
-          if(av.action&&oid2){
-            const r=await processQuery(av.action+' '+av.info,oid2);
-            const a=r.answer||r;const acts=r.actions||[];
-            await sendMsg(oid2,a,acts);
-          }
-          res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}));
-        }
-        if(et!=='im.message.receive_v1'){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}))}
+        const h=d.header||{};const et=h.event_type||'';const ev=d.event||{};const msg=ev.message||{};if(et!=='im.message.receive_v1'){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}))}
         if(seen.has(msg.message_id)){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}))}seen.add(msg.message_id);
         let text='',imgKey='';try{const c=JSON.parse(msg.content||'{}');text=c.text||'';imgKey=c.image_key||''}catch(e){}
         const oid=((ev.sender||{}).sender_id||(d.sender||{})).open_id||(d.sender||{}).open_id||'';last={et,text:!!text,img:!!imgKey,content:(msg.content||'').substring(0,200)};
