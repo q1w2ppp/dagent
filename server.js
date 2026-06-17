@@ -45,23 +45,31 @@ async function analyzeImage(imageData,mimeType){
 
 // ═══ Process Query with Step 2 + AI ═══
 async function processQuery(q,chatId){
-  const intents=[{re:/参考|灵感|有没有|找找|我想做|主题/i,type:'inspire'},{re:/分析|拆解|为什么好/i,type:'deconstruct'},{re:/方向|思路|创意|方案/i,type:'direct'},{re:/比赛|参赛|投哪个/i,type:'compete'},{re:/审|检查|帮我看|问题|批评/i,type:'critique'}];
-  let intent='inspire';for(const p of intents)if(p.re.test(q)){intent=p.type;break}
-  const works=matchWorks(q),designers=matchDesigners(q);
-  let ctx='## 知识库匹配结果\n';
-  if(works.length){ctx+=`\n${works.length}件作品：\n`;works.forEach(w=>{const d=getDesigner(w.designer);ctx+=`- ${w.title}(${w.comp}) · ${w.theme} · ${w.concept} · ${w.visual} · 设计师:${d?d.name:''}\n`})}else ctx+='\n未匹配到相关作品。\n';
-  if(designers.length){ctx+=`\n${designers.length}位设计师：\n`;designers.forEach(d=>ctx+=`- ${d.name} · ${d.tags.join(' ')} · ${d.strategies.join(' ')}\n`)}
-  if(intent==='compete'&&works.length){ctx+='\n比赛推荐：\n';for(const[k,c]of Object.entries(COMPS))ctx+=`- ${c.name}: ${c.w.c}%概念 ${c.w.e}%执行 ${c.w.i}%创新 · ${c.pref}\n`}
-  if(intent==='critique')ctx+=`\n审查清单：${THEORY}\n`;
-  // Lightweight intent: skip KB for greetings
-  const isDesignQuery=!/^(你好|hi|hello|谢谢|再见|早|晚安|在吗|嗯|哦|好的)[\s!！。.]*$/i.test(q.trim())&&q.trim().length>5;
-  if(!isDesignQuery){return askDeepSeek('你是设计评论家助手，回答简洁友好，1-2句话即可。不需要引用具体设计师。',q,chatId)}
+  // Check if this is a design query
+  const isDesignQuery=!/^(你好|hi|hello|谢谢|再见|早|晚安|在吗|嗯|哦|好的|ok)[\s!！。.]*$/i.test(q.trim())&&q.trim().length>4;
+  if(!isDesignQuery)return askDeepSeek('你是设计评论家助手，回答简洁友好。',q,chatId);
   
-  const sysBase=`你是设计评论家。基于知识库分析。必须引用具体设计师名和作品名。知识库概要：
-设计师：Paula Scher(文字即图形/Public Theater)、原研哉(极简/空寂/MUJI)、施德明(概念驱动/实验)、穆勒-布罗克曼(瑞士网格/Beethoven)、大卫卡森(解构/Ray Gun)、田中一光(传统几何化/Nihon Buyo)、Tibor Kalman(社会设计/Colors)、Michael Bierut(大众设计/Hillary)、奥托艾舍(系统图标/慕尼黑奥运)、Irma Boom(书籍物体)
-作品：Plastic Ocean(D&AD环保)、Muji Horizons(iF极简)、Ray Gun(AIGA反设计)、Public Theater(Cannes文字即图形)、Nihon Buyo(Tokyo TDC)、Colors Race(D&AD社会议题)
-审查：网格对齐/格式塔/视觉动线/字体层级/色彩语义(致命重要建议三级)\n${ctx}`;
-  return askDeepSeek(sysBase,q,chatId);
+  // Step A: AI extracts intent + keywords
+  let intent='inspire',keywords=[];
+  try{
+    const prePrompt='提取意图和关键词，只返回JSON：{"intent":"类型","keywords":["词1","词2"]}。intent可选:inspire(找参考) deconstruct(分析作品) direct(出方向) compete(看比赛) critique(审设计)';
+    const raw=await askDeepSeek(prePrompt,q,chatId+'_pre');
+    const m=raw.match(/\{[\s\S]*\}/);if(m)try{const p=JSON.parse(m[0]);intent=p.intent||'inspire';keywords=p.keywords||[]}catch(e){}
+  }catch(e){}
+  if(!keywords.length)keywords=q.split(/[\s,，。！？、]+/).filter(w=>w.length>1);
+  
+  // Step B: Matching engine
+  const kwStr=keywords.join(' ');
+  const works=matchWorks(kwStr),designers=matchDesigners(kwStr);
+  let ctx='## 匹配结果\n';
+  if(works.length){ctx+=works.length+'件作品：\n';works.forEach(w=>{const d=getDesigner(w.designer);ctx+=`- ${w.title}(${w.comp}) · ${w.theme} · ${w.concept} · 设计师:${d?d.name:''}\n`})}else ctx+='未匹配到作品。\n';
+  if(designers.length){ctx+=designers.length+'位设计师：\n';designers.forEach(d=>ctx+=`- ${d.name} · ${d.tags.join(' ')} · ${d.strategies.join(' ')}\n`)}
+  if(intent==='compete'&&works.length){ctx+='\n比赛：\n';for(const[k,c]of Object.entries(COMPS))ctx+=`- ${c.name}:概念${c.w.c}% 执行${c.w.e}% 创新${c.w.i}% · ${c.pref}\n`}
+  if(intent==='critique')ctx+=THEORY+'\n';
+  
+  // Step C: AI narrates
+  const sys=`你是设计评论家。只能引用下方匹配结果中出现的具体设计师名和作品名。匹配结果中没有的绝对不编造。如果未匹配到，诚实说明。\n${ctx}`;
+  return askDeepSeek(sys,q,chatId);
 }
 
 // ═══ Feishu Helpers ═══
