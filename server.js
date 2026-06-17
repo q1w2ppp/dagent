@@ -166,7 +166,14 @@ const server=http.createServer(async(req,res)=>{
   res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','Content-Type');res.setHeader('Access-Control-Allow-Methods','POST,GET,OPTIONS');
   if(req.method==='OPTIONS'){res.writeHead(204);return res.end()}
   if(req.method==='GET'&&req.url==='/'){res.writeHead(200);return res.end('OK')}
-  if(req.method==='GET'&&req.url==='/version'){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({v:'3-hybrid',designers:DESIGNERS.length,works:WORKS.length}))}
+  if(req.method==='GET'&&req.url==='/test-gemini'){
+    try{
+      const result=await analyzeImage('',req.url.includes('?k=')?decodeURIComponent(req.url.split('?k=')[1]):'');
+      res.writeHead(200,{'Content-Type':'text/plain'});
+      res.end(result);
+    }catch(e){res.writeHead(500);res.end('Gemini Error: '+e.message)}
+    return;
+  }
   if(req.method==='GET'&&req.url.startsWith('/test/')){
     const q=decodeURIComponent(req.url.slice(6));
     const w=matchWorks(q);const d=matchDesigners(q);
