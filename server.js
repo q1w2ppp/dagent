@@ -31,14 +31,11 @@ async function analyzeImage(imageData,mimeType){
   return new Promise(async(resolve,reject)=>{
     if(!GLM_KEY){resolve('GLM_KEY未配置');return}
     try{
-      // Upload to file.io for temp public URL
-      const buf=Buffer.from(imageData,'base64');
-      const upResp=await new Promise((res,rej)=>{
-        const r=https.request({hostname:'file.io',path:'/',method:'POST',headers:{'Content-Length':buf.length}},rs=>{let d='';rs.on('data',c=>d+=c);rs.on('end',()=>{try{res(JSON.parse(d))}catch(e){rej(e)}})});r.on('error',rej);r.write(buf);r.end()
-      });
-      const imgUrl=upResp.link;
-      if(!imgUrl){resolve('图床上传失败');return}
-      // GLM-4.6V with public URL
+      // Save image locally, serve via self URL
+      const imgId='img_'+Date.now();
+      const imgCache=new Map();
+      imgCache.set(imgId,{data:imageData,mime:mimeType});
+      const imgUrl='https://dagent-x8o8.onrender.com/img/'+imgId;
       const body=JSON.stringify({model:'glm-4.6v',messages:[{role:'user',content:[{type:'text',text:'请分析后面图片的设计风格、配色、排版，推荐设计师和比赛'},{type:'image_url',image_url:{url:imgUrl}}]}],max_tokens:1000});
       const r=https.request({hostname:'open.bigmodel.cn',path:'/api/paas/v4/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':GLM_KEY,'Content-Length':Buffer.byteLength(body)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{const j=JSON.parse(d);const c=j.choices?.[0]?.message;resolve(c?.content||c?.reasoning_content||('RAW:'+d.substring(0,200)))}catch(e){resolve('RAW:'+d.substring(0,200))}})});r.on('error',e=>{last.imgErr=e.message;resolve('NET:'+e.message)});r.write(body);r.end()
     }catch(e){resolve('UP:'+e.message)}
@@ -85,9 +82,15 @@ async function downloadImage(key,token){return new Promise((resolve,reject)=>{co
 
 // ═══ Server ═══
 const seen=new Set();let last={};
+const imgCache=new Map();
 const server=http.createServer(async(req,res)=>{
   res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','Content-Type');
   if(req.method==='OPTIONS'){res.writeHead(204);return res.end()}
+  if(req.method==='GET'&&req.url.startsWith('/img/')){
+    const id=req.url.slice(5);const img=imgCache.get(id);
+    if(img){res.writeHead(200,{'Content-Type':img.mime||'image/png'});return res.end(Buffer.from(img.data,'base64'))}
+    res.writeHead(404);return res.end()
+  }
   if(req.method==='GET'&&req.url==='/test-send'){
     try{await sendMsg('ou_b88be4a4e6b6939cfbbc95feacfea648','测试消息-来自服务器');res.writeHead(200);res.end('sent')}catch(e){res.writeHead(500);res.end('fail:'+e.message)}
     return;
