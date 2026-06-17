@@ -42,7 +42,18 @@ async function processQuery(q,chatId){
   if(designers.length){ctx+=`\n${designers.length}位设计师：\n`;designers.forEach(d=>ctx+=`- ${d.name} · ${d.tags.join(' ')} · ${d.strategies.join(' ')}\n`)}
   if(intent==='compete'&&works.length){ctx+='\n比赛推荐：\n';for(const[k,c]of Object.entries(COMPS))ctx+=`- ${c.name}: ${c.w.c}%概念 ${c.w.e}%执行 ${c.w.i}%创新 · ${c.pref}\n`}
   if(intent==='critique')ctx+=`\n审查清单：${THEORY}\n`;
-  return askDeepSeek('你是设计评论家。基于匹配结果回答。规则：1.必须引用具体作品名和设计师名 2.匹配不到诚实说 3.不编造。\n'+ctx,q,chatId);
+  const sysBase=`你是设计评论家。根据下方知识库匹配结果回答。规则：
+1. 必须引用匹配结果中的具体作品名、设计师名、比赛名
+2. 匹配结果如果有就用，如果没有诚实说「知识库中无完美匹配，以下是最近似参考」
+3. 绝对不编造作品名或设计师名——只引用匹配结果中出现的
+4. 用户说"参考/灵感/我想做"→推荐2-3作品+2位设计师(说明为什么匹配)
+5. 用户说"分析/拆解"→从概念/视觉/排版/色彩四维度拆解，给设计推理链
+6. 用户说"方向/思路"→生成3个具体创意方向(含策略+视觉关键词+参考+风险)
+7. 用户说"比赛/参赛"→推荐比赛+匹配理由+权重分析+风险提示
+8. 用户说"审/检查/问题"→按审查清单逐项对照(致命/重要/建议三级)，列前3优先改
+9. 不说"你可以这样""值得注意的是"——直接给结论
+10. 引用理论库规则时说明是"设计理论库"而非自己编的\n${ctx}`;
+  return askDeepSeek(sysBase,q,chatId);
 }
 
 // ═══ Feishu Helpers ═══
