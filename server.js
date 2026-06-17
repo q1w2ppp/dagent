@@ -34,7 +34,7 @@ async function analyzeImage(imageData,mimeType){
       // Upload to imgbb free image host
       const formData='image='+encodeURIComponent(imageData);
       const upResp=await new Promise((res,rej)=>{
-        const r=https.request({hostname:'api.imgbb.com',path:'/1/upload?key=a1c1e3c4c5e6f7a8b9c0d1e2f3a4b5c6',method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','Content-Length':Buffer.byteLength(formData)}},rs=>{let d='';rs.on('data',c=>d+=c);rs.on('end',()=>{try{res(JSON.parse(d))}catch(e){rej(e)}})});r.on('error',rej);r.write(formData);r.end()
+        const r=https.request({hostname:'api.imgbb.com',path:'/1/upload?key='+IMGBB_KEY,method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','Content-Length':Buffer.byteLength(formData)}},rs=>{let d='';rs.on('data',c=>d+=c);rs.on('end',()=>{try{res(JSON.parse(d))}catch(e){rej(e)}})});r.on('error',rej);r.write(formData);r.end()
       });
       const imgUrl=upResp.data?.url||upResp.data?.display_url;
       if(!imgUrl){resolve('图床上传失败');return}
