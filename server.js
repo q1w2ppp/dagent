@@ -61,6 +61,7 @@ function scoreComps(w){
 
 // ═══ DeepSeek API ═══
 const hist=new Map();
+const seenMsgs=new Set(); // dedup Feishu messages
 function askDeepSeek(systemPrompt,userMsg,chatId){
   if(!hist.has(chatId))hist.set(chatId,[]);
   const h=hist.get(chatId);h.push({role:'user',content:userMsg});
@@ -167,6 +168,9 @@ const server=http.createServer(async(req,res)=>{
         console.log('[FEISHU] event:',et);
         if(et==='im.message.receive_v1'){
           const ev=data.event||data;
+          const msgId=ev.message?.message_id||data.message?.message_id||'';
+          if(seenMsgs.has(msgId)){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}))}
+          seenMsgs.add(msgId);if(seenMsgs.size>200)seenMsgs.clear();
           const msg=ev.message||data.message||{};
           let text='';
           try{text=typeof msg.content==='string'?JSON.parse(msg.content).text:''}catch(e){}
