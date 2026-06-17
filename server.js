@@ -201,8 +201,16 @@ const server=http.createServer(async(req,res)=>{
     let body='';req.on('data',c=>body+=c);
     req.on('end',async()=>{
       console.log('[FEISHU]',body.substring(0,400));
-      lastEvent={time:new Date().toISOString(),type:req.body?.header?.event_type||'parsing',body:body.substring(0,500)};
       try{const data=JSON.parse(body);
+        if(data.type==='url_verification'||data.challenge){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({challenge:data.challenge||data.token}))}
+        const h=data.header||(data.event||{}).header||{};
+        const et=h.event_type||data.type||'';
+        const ev=data.event||data;
+        const msg=ev.message||data.message||{};
+        let text='';try{text=typeof msg.content==='string'?JSON.parse(msg.content).text:''}catch(e){}
+        let imageKey='';try{imageKey=typeof msg.content==='string'?JSON.parse(msg.content).image_key:''}catch(e){}
+        const oid=ev.sender?.sender_id?.open_id||data.sender?.open_id||'';
+        lastEvent={time:new Date().toISOString(),et:et,text:text,hasImage:!!imageKey,imgKey:imageKey||'none',body:body.substring(0,500)};
         if(data.type==='url_verification'||data.challenge){console.log('[FEISHU] challenge');res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({challenge:data.challenge||data.token}))}
         const h=data.header||(data.event||{}).header||{};
         const et=h.event_type||data.type||'';
