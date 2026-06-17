@@ -80,7 +80,7 @@ const server=http.createServer(async(req,res)=>{
         const h=d.header||{};const et=h.event_type||'';const ev=d.event||{};const msg=ev.message||{};if(et!=='im.message.receive_v1'){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}))}
         if(seen.has(msg.message_id)){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}))}seen.add(msg.message_id);
         let text='',imgKey='';try{const c=JSON.parse(msg.content||'{}');text=c.text||'';imgKey=c.image_key||''}catch(e){}
-        const oid=(ev.sender||{}).sender_id||(d.sender||{}).open_id||'';last={et,text:!!text,img:!!imgKey,content:(msg.content||'').substring(0,200)};
+        const oid=((ev.sender||{}).sender_id||(d.sender||{})).open_id||(d.sender||{}).open_id||'';last={et,text:!!text,img:!!imgKey,content:(msg.content||'').substring(0,200)};
         if(imgKey&&oid){try{last.step='analyzing';const tk=await getToken();const b64=await downloadImage(imgKey,tk);const a=await analyzeImage(b64);await sendMsg(oid,a);last.step='img-ok'}catch(e){last.step='img-err:'+e.message;await sendMsg(oid,'图片分析失败：'+e.message)}}
         else if(text&&oid){try{last.step='querying';const a=await processQuery(text,oid);last.step='sending';await sendMsg(oid,a);last.step='sent'}catch(e){last.step='err:'+e.message}}
         res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({code:0}));
