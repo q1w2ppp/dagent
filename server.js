@@ -79,7 +79,7 @@ async function sendMsg(oid,text){
     });
   }catch(e){last.sent='TOKEN:'+e.message;throw e}
 }
-async function downloadImage(key,token){return new Promise((resolve,reject)=>{const r=https.request({hostname:'open.feishu.cn',path:'/open-apis/im/v1/images/'+key,method:'GET',headers:{'Authorization':'Bearer '+token}},res=>{const chunks=[];const mime=res.headers['content-type']||'image/png';if(!mime.startsWith('image/')){let d='';res.on('data',c=>d+=c);res.on('end',()=>reject(new Error('Not an image: '+d.substring(0,100))));return}res.on('data',c=>chunks.push(c));res.on('end',()=>resolve({data:Buffer.concat(chunks).toString('base64'),mime:mime.split(';')[0].trim()}))});r.on('error',reject);r.end()})}
+async function downloadFeishuFile(msgId,fileKey,token){return new Promise((resolve,reject)=>{const r=https.request({hostname:'open.feishu.cn',path:'/open-apis/im/v1/messages/'+msgId+'/resources/'+fileKey+'?type=image',method:'GET',headers:{'Authorization':'Bearer '+token}},res=>{const chunks=[];const mime=res.headers['content-type']||'image/png';if(!mime.startsWith('image/')){let d='';res.on('data',c=>d+=c);res.on('end',()=>reject(new Error('Not image: '+d.substring(0,100))));return}res.on('data',c=>chunks.push(c));res.on('end',()=>resolve({data:Buffer.concat(chunks).toString('base64'),mime:mime.split(';')[0].trim()}))});r.on('error',reject);r.end()})}
 
 // ═══ Server ═══
 const seen=new Set();let last={};
@@ -109,7 +109,7 @@ const server=http.createServer(async(req,res)=>{
         if(seen.has(msg.message_id)){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}))}seen.add(msg.message_id);
         let text='',imgKey='';try{const c=JSON.parse(msg.content||'{}');text=c.text||'';imgKey=c.image_key||''}catch(e){}
         const oid=((ev.sender||{}).sender_id||(d.sender||{})).open_id||(d.sender||{}).open_id||'';last={et,text:!!text,img:!!imgKey,content:(msg.content||'').substring(0,200)};
-        if(imgKey&&oid){try{last.step='dl';const tk=await getToken();const img=await downloadImage(imgKey,tk);last.step='got-'+img.data.length;const a=await analyzeImage(img.data,img.mime);last.imgResult=a.substring(0,100);await sendMsg(oid,a);last.step='ok'}catch(e){last.imgResult='ERR:'+e.message;last.step='fail';await sendMsg(oid,'错误:'+e.message)}}
+        if(imgKey&&oid){try{last.step='dl';const tk=await getToken();const msgId=msg.message_id||'';const img=await downloadFeishuFile(msgId,imgKey,tk);last.step='got-'+img.data.length;const a=await analyzeImage(img.data,img.mime);last.imgResult=a.substring(0,100);await sendMsg(oid,a);last.step='ok'}catch(e){last.imgResult='ERR:'+e.message;last.step='fail';await sendMsg(oid,'错误:'+e.message)}}
         else if(text&&oid){try{last.step='querying';const a=await processQuery(text,oid);last.step='sending';await sendMsg(oid,a);last.step='sent'}catch(e){last.step='err:'+e.message}}
         res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({code:0}));
       }catch(e){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({code:0}))}
