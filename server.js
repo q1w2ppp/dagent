@@ -121,7 +121,18 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='POST'&&req.url==='/feishu'){
     let body='';req.on('data',c=>body+=c);req.on('end',async()=>{
       try{const d=JSON.parse(body);if(d.type==='url_verification'||d.challenge){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({challenge:d.challenge||d.token}))}
-        const h=d.header||{};const et=h.event_type||'';const ev=d.event||{};const msg=ev.message||{};if(et!=='im.message.receive_v1'){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}))}
+        const h=d.header||{};const et=h.event_type||'';const ev=d.event||{};const msg=ev.message||{};
+        if(et==='card.action.trigger'){
+          const av=JSON.parse((d.action||{}).value||'{}');
+          const oid2=d.open_id||(d.user||{}).open_id||'';
+          last={et:'btn',a:av.action};
+          if(av.action&&oid2){
+            const r=await processQuery(av.action+' '+av.info,oid2);
+            await sendMsg(oid2,r.answer||r,r.actions||[]);
+          }
+          res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}));
+        }
+        if(et!=='im.message.receive_v1'){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}))}
         if(seen.has(msg.message_id)){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}))}seen.add(msg.message_id);
         let text='',imgKey='';try{const c=JSON.parse(msg.content||'{}');text=c.text||'';imgKey=c.image_key||''}catch(e){}
         const oid=((ev.sender||{}).sender_id||(d.sender||{})).open_id||(d.sender||{}).open_id||'';last={et,text:!!text,img:!!imgKey,content:(msg.content||'').substring(0,200)};
