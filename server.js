@@ -126,7 +126,7 @@ const server=http.createServer(async(req,res)=>{
           const ev2=d.event||d;const raw=(ev2.action||d.action||{});let av={};
           try{av=JSON.parse(raw.value||'{}')}catch(e){}
           if(typeof av==='string')try{av=JSON.parse(av)}catch(e){}
-          const oid2=d.open_id||(d.user||{}).open_id||(d.operator||{}).open_id||'';
+          const oid2=d.open_id||(d.user||{}).open_id||(d.operator||{}).open_id||(ev2.operator||{}).open_id||'';
           last={et:'btn',a:av.action,oid:oid2};
           if(av.action&&oid2){
             const r=await processQuery(av.action+' '+av.info,oid2);
