@@ -168,10 +168,14 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='GET'&&req.url==='/'){res.writeHead(200);return res.end('OK')}
   if(req.method==='GET'&&req.url==='/test-gemini'){
     try{
-      const result=await analyzeImage('',req.url.includes('?k=')?decodeURIComponent(req.url.split('?k=')[1]):'');
-      res.writeHead(200,{'Content-Type':'text/plain'});
-      res.end(result);
-    }catch(e){res.writeHead(500);res.end('Gemini Error: '+e.message)}
+      const result=await new Promise((resolve,reject)=>{
+        const body=JSON.stringify({contents:[{parts:[{text:'say ok'}]}]});
+        const r=https.request({hostname:'generativelanguage.googleapis.com',path:'/v1beta/models/gemini-2.0-flash:generateContent?key='+GEMINI_KEY,method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(body)}},res=>{
+          let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{const j=JSON.parse(d);resolve(j.candidates?.[0]?.content?.parts?.[0]?.text||d)}catch(e){resolve(d)}})
+        });r.on('error',e=>resolve('NET:'+e.message));r.write(body);r.end();
+      });
+      res.writeHead(200,{'Content-Type':'text/plain'});res.end(result);
+    }catch(e){res.writeHead(500);res.end('err:'+e.message)}
     return;
   }
   if(req.method==='GET'&&req.url.startsWith('/test/')){
