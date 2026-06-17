@@ -28,10 +28,20 @@ async function askDeepSeek(system,msg,chatId){
   });
 }
 async function analyzeImage(imageBase64,query){
-  return new Promise((resolve,reject)=>{
+  return new Promise(async(resolve,reject)=>{
     if(!GLM_KEY){resolve('GLM_KEY未配置');return}
-    const body=JSON.stringify({model:'glm-4.6v',messages:[{role:'user',content:[{type:'text',text:query||'分析设计作品'},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+imageBase64}}]}],max_tokens:500});
-    const r=https.request({hostname:'open.bigmodel.cn',path:'/api/paas/v4/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':GLM_KEY,'Content-Length':Buffer.byteLength(body)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{const j=JSON.parse(d);resolve(j.choices?.[0]?.message?.content||('RAW:'+d.substring(0,200)))}catch(e){resolve('RAW:'+d.substring(0,200))}})});r.on('error',e=>{last.imgErr=e.message;resolve('NET:'+e.message)});r.write(body);r.end()
+    try{
+      // Step 1: Upload image to Zhipu
+      const upBody=JSON.stringify({purpose:'file',file:imageBase64,filename:'img.jpg'});
+      const upResp=await new Promise((res,rej)=>{
+        const r=https.request({hostname:'open.bigmodel.cn',path:'/api/paas/v4/files',method:'POST',headers:{'Content-Type':'application/json','Authorization':GLM_KEY,'Content-Length':Buffer.byteLength(upBody)}},rs=>{let d='';rs.on('data',c=>d+=c);rs.on('end',()=>{try{res(JSON.parse(d))}catch(e){rej(e)}})});r.on('error',rej);r.write(upBody);r.end()
+      });
+      const fileId=upResp.id;
+      if(!fileId){resolve('文件上传失败:'+JSON.stringify(upResp).substring(0,100));return}
+      // Step 2: Call GLM-4V with file reference
+      const body=JSON.stringify({model:'glm-4.6v',messages:[{role:'user',content:[{type:'text',text:query||'分析设计作品'},{type:'image_url',image_url:{url:fileId}}]}],max_tokens:500});
+      const r=https.request({hostname:'open.bigmodel.cn',path:'/api/paas/v4/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':GLM_KEY,'Content-Length':Buffer.byteLength(body)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{const j=JSON.parse(d);resolve(j.choices?.[0]?.message?.content||('RAW:'+d.substring(0,200)))}catch(e){resolve('RAW:'+d.substring(0,200))}})});r.on('error',e=>{last.imgErr=e.message;resolve('NET:'+e.message)});r.write(body);r.end()
+    }catch(e){resolve('UP:'+e.message)}
   });
 }
 
