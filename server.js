@@ -44,8 +44,6 @@ async function analyzeImage(imageData,mimeType){
       if(!imgUrl){resolve('图床上传失败');return}
       // Call GLM with pixeldrain URL
       const body=JSON.stringify({model:'glm-4v',messages:[{role:'user',content:[{type:'text',text:'分析此设计'},{type:'image_url',image_url:{url:imgUrl}}]}],max_tokens:500});
-      // Call GLM with public URL
-      const body=JSON.stringify({model:'glm-4v',messages:[{role:'user',content:[{type:'text',text:'分析这张设计作品的风格、配色、排版，推荐2-3位设计师'},{type:'image_url',image_url:{url:imgUrl}}]}],max_tokens:500});
       const r=https.request({hostname:'open.bigmodel.cn',path:'/api/paas/v4/chat/completions',method:'POST',headers:{'Content-Type':'application/json','Authorization':GLM_KEY,'Content-Length':Buffer.byteLength(body)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{const j=JSON.parse(d);resolve(j.choices?.[0]?.message?.content||('RAW:'+d.substring(0,200)))}catch(e){resolve('RAW:'+d.substring(0,200))}})});r.on('error',e=>{last.imgErr=e.message;resolve('NET:'+e.message)});r.write(body);r.end()
     }catch(e){resolve('UP:'+e.message)}
   });
