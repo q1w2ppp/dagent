@@ -30,7 +30,7 @@ async function askDeepSeek(system,msg,chatId){
 }
 async function analyzeImage(imageData,mimeType){
   return new Promise(async(resolve,reject)=>{
-    if(!GLM_KEY){resolve('GLM_KEY未配置');return}
+    if(!SF_KEY){resolve('SF_KEY未配置');return}
     try{
       // Upload to Zhipu's own image API
       const body=JSON.stringify({model:'Qwen/Qwen3-VL-8B-Instruct',messages:[{role:'user',content:[{type:'text',text:'分析后面图片的设计风格、配色、排版，推荐设计师和比赛'},{type:'image_url',image_url:{url:'data:'+(mimeType||'image/png')+';base64,'+imageData}}]}],max_tokens:500});
