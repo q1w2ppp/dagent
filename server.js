@@ -5,7 +5,7 @@ const DEEPSEEK_KEY=process.env.DEEPSEEK_KEY||'';
 const VISION_KEY=process.env.VISION_KEY||'';
 const OPENAI_KEY=process.env.OPENAI_KEY||'';
 const GLM_KEY=process.env.GLM_KEY||'';
-const SF_KEY='sk-hbmltomiqerehbvcdthingrmzjqnvgrvvvbtwdfvpqhvbtvc';
+const SF_KEY=process.env.SF_KEY||'sk-mfluimykjudhnlpzlmdeauggffnqqvfnbxabtxubnvnpzgod';
 
 // ═══ Knowledge Base ═══
 const DESIGNERS=[{id:'paula-scher',name:'Paula Scher',tags:'后现代 信息密度 文字即图形'.split(' '),strategies:'文字填充空间 对比尺度跳跃'.split(' '),best_for:'品牌 海报 出版'.split(' '),work:'Public Theater / Citi'},{id:'kenya-hara',name:'Kenya Hara',tags:'极简 空寂 东方美学'.split(' '),strategies:'留白即信息 空的比满有力'.split(' '),best_for:'生活方式 文化 包装'.split(' '),work:'MUJI'},{id:'stefan-sagmeister',name:'Stefan Sagmeister',tags:'概念驱动 实验性 身体艺术'.split(' '),strategies:'用身体当画布 手写文字'.split(' '),best_for:'实验海报 音乐 艺术书'.split(' '),work:'Things I Learned'},{id:'josef-brockmann',name:'Josef Muller-Brockmann',tags:'瑞士国际 网格 数学美学'.split(' '),strategies:'网格即一切 数学比例'.split(' '),best_for:'海报 出版 展览'.split(' '),work:'Beethoven海报'},{id:'tibor-kalman',name:'Tibor Kalman',tags:'社会设计 反消费主义'.split(' '),strategies:'用设计讲社会议题 反精致'.split(' '),best_for:'社会运动 NGO'.split(' '),work:'Colors杂志'},{id:'david-carson',name:'David Carson',tags:'解构 反设计 实验排版'.split(' '),strategies:'打破网格 文字当纹理'.split(' '),best_for:'音乐 杂志 青年'.split(' '),work:'Ray Gun'},{id:'田中一光',name:'Ikko Tanaka',tags:'日本传统 几何化 东西融合'.split(' '),strategies:'传统纹样几何化 符号化'.split(' '),best_for:'文化 和风 出版'.split(' '),work:'Nihon Buyo'},{id:'michael-bierut',name:'Michael Bierut',tags:'大众设计 叙事 实用主义'.split(' '),strategies:'清晰的叙事线 人人能懂'.split(' '),best_for:'大型机构 公共'.split(' '),work:'Hillary 2016'}];
