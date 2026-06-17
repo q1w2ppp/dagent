@@ -220,15 +220,15 @@ const server=http.createServer(async(req,res)=>{
           let imageKey='';
           try{imageKey=typeof msg.content==='string'?JSON.parse(msg.content).image_key:''}catch(e){}
           if(imageKey&&oid){
-            console.log('[FEISHU] image received, key:',imageKey);
+            console.log('[FEISHU] analyzing image...');
             try{
               const token=await getToken();
               const imgBase64=await downloadFeishuImage(imageKey,token);
-              console.log('[FEISHU] image downloaded, size:',imgBase64.length);
-              const analysis=await analyzeImage(imgBase64,'分析设计作品');
-              console.log('[FEISHU] Gemini response:',analysis.substring(0,100));
+              const analysis=await analyzeImage(imgBase64,'分析这张设计作品');
+              lastEvent.imgResult='ok:'+analysis.substring(0,100);
               await sendMsg(oid,analysis);
-            }catch(e){console.error('[FEISHU] image error:',e.message);await sendMsg(oid,'图片分析失败：'+e.message)}
+            }catch(e){lastEvent.imgResult='err:'+e.message;await sendMsg(oid,'图片分析失败：'+e.message)}
+            lastEvent.imgResult=lastEvent.imgResult||'sent';
           }else if(text&&oid){
             const answer=await processQuery(text,oid);await sendMsg(oid,answer);
           }
