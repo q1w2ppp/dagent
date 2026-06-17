@@ -139,6 +139,12 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='OPTIONS'){res.writeHead(204);return res.end()}
   if(req.method==='GET'&&req.url==='/'){res.writeHead(200);return res.end('OK')}
   if(req.method==='GET'&&req.url==='/version'){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({v:'3-hybrid',designers:DESIGNERS.length,works:WORKS.length}))}
+  if(req.method==='GET'&&req.url.startsWith('/test/')){
+    const q=decodeURIComponent(req.url.slice(6));
+    const w=matchWorks(q);const d=matchDesigners(q);
+    res.writeHead(200,{'Content-Type':'application/json'});
+    return res.end(JSON.stringify({query:q,works:w.map(x=>x.title),designers:d.map(x=>x.name)}));
+  }
   
   // Frontend API
   if(req.method==='POST'&&req.url==='/api/chat'){
