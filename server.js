@@ -102,6 +102,8 @@ async function sendMsg(openId,text){
 
 const server=http.createServer(async(req,res)=>{
   res.setHeader('Access-Control-Allow-Origin','*');
+  res.setHeader('Access-Control-Allow-Headers','Content-Type');
+  res.setHeader('Access-Control-Allow-Methods','POST,GET,OPTIONS');
   if(req.method==='OPTIONS'){res.writeHead(204);return res.end()}
   
   // Health check
