@@ -47,7 +47,7 @@ async function analyzeImage(imageData,mimeType){
 async function processQuery(q,chatId){
   // Check if this is a design query
   const isDesignQuery=!/^(你好|hi|hello|谢谢|再见|早|晚安|在吗|嗯|哦|好的|ok)[\s!！。.]*$/i.test(q.trim())&&q.trim().length>4;
-  if(!isDesignQuery)return askDeepSeek('你是设计评论家助手，回答简洁友好。',q,chatId);
+  if(!isDesignQuery)return {answer:await askDeepSeek('你是设计评论家助手，回答简洁友好。',q,chatId)};
   
   // Step A: AI extracts intent + keywords
   let intent='inspire',keywords=[];
@@ -68,16 +68,25 @@ async function processQuery(q,chatId){
   if(intent==='critique')ctx+=THEORY+'\n';
   
   // Step C: AI narrates
+  // Step C: AI narrates + action buttons
+  const actions=[];
+  if(works.length){actions.push({label:'🧬 拆解分析',type:'primary',value:{action:'帮我分析这些作品的设计策略',info:works.map(w=>w.title).join(' ')}});actions.push({label:'💡 出方向',type:'default',value:{action:'基于这个主题给我3个创意方向',info:keywords.join(' ')}});}
+  if(designers.length)actions.push({label:'🏆 推荐比赛',type:'default',value:{action:'这些作品适合参加什么比赛',info:designers.map(d=>d.name).join(' ')}});
+  actions.push({label:'🧐 审查清单',type:'default',value:{action:'对照设计理论帮我审查',info:intent}});
+  
   const sys=`你是资深设计评论家。请引用匹配结果中的设计师和作品展开分析，可以基于他们的风格延伸建议，但不要编造不存在的具体作品名。语言自然有洞察力，不要说'目前匹配结果中没有更多'这类话。\n${ctx}`;
-  return askDeepSeek(sys,q,chatId);
+  const answer=await askDeepSeek(sys,q,chatId);
+  return {answer,actions:actions.slice(0,3)};
 }
 
 // ═══ Feishu Helpers ═══
 async function getToken(){return new Promise((resolve,reject)=>{const b=JSON.stringify({app_id:APP_ID,app_secret:APP_SECRET});const r=https.request({hostname:'open.feishu.cn',path:'/open-apis/auth/v3/tenant_access_token/internal',method:'POST',headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(b)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{try{resolve(JSON.parse(d).tenant_access_token)}catch(e){reject(e)}})});r.on('error',reject);r.write(b);r.end()})}
-async function sendMsg(oid,text){
+async function sendMsg(oid,text,actions){
   try{
     const token=await getToken();
-    const b=JSON.stringify({receive_id:oid,msg_type:'interactive',content:JSON.stringify({config:{wide_screen_mode:true},header:{title:{tag:'plain_text',content:'Design Agent'},template:'wathet'},elements:[{tag:'div',text:{tag:'lark_md',content:text}}]})});
+    const elements=[{tag:'div',text:{tag:'lark_md',content:text}}];
+    if(actions&&actions.length)elements.push({tag:'action',actions:actions.map(a=>({tag:'button',text:{tag:'plain_text',content:a.label},type:a.type||'primary',value:JSON.stringify(a.value)}))});
+    const b=JSON.stringify({receive_id:oid,msg_type:'interactive',content:JSON.stringify({config:{wide_screen_mode:true},header:{title:{tag:'plain_text',content:'Design Agent'},template:'wathet'},elements})});
     return new Promise((resolve,reject)=>{
       const r=https.request({hostname:'open.feishu.cn',path:'/open-apis/im/v1/messages?receive_id_type=open_id',method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'Content-Length':Buffer.byteLength(b)}},res=>{let d='';res.on('data',c=>d+=c);res.on('end',()=>{last.sent=d;resolve()})});
       r.on('error',e=>{last.sent='NET:'+e.message;reject(e)});r.write(b);r.end();
@@ -106,18 +115,31 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='GET'&&req.url==='/debug'){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify(last))}
   
   if(req.method==='POST'&&req.url==='/api/chat'){
-    let body='';req.on('data',c=>body+=c);req.on('end',async()=>{try{const d=JSON.parse(body);const a=await processQuery(d.message,d.chatId||'w');res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({answer:a}))}catch(e){res.writeHead(500);res.end(JSON.stringify({error:e.message}))}});return;
+    let body='';req.on('data',c=>body+=c);req.on('end',async()=>{try{const d=JSON.parse(body);const r=await processQuery(d.message,d.chatId||'w');res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({answer:r.answer||r,actions:r.actions||[]}))}catch(e){res.writeHead(500);res.end(JSON.stringify({error:e.message}))}});return;
   }
   
   if(req.method==='POST'&&req.url==='/feishu'){
     let body='';req.on('data',c=>body+=c);req.on('end',async()=>{
       try{const d=JSON.parse(body);if(d.type==='url_verification'||d.challenge){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({challenge:d.challenge||d.token}))}
-        const h=d.header||{};const et=h.event_type||'';const ev=d.event||{};const msg=ev.message||{};if(et!=='im.message.receive_v1'){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}))}
+        const h=d.header||{};const et=h.event_type||'';const ev=d.event||{};const msg=ev.message||{};
+        // Card action trigger
+        if(et==='card.action.trigger'){
+          const av=JSON.parse((d.action||{}).value||'{}');
+          const oid2=d.open_id||(d.user||{}).open_id||'';
+          last={et:'card_btn',action:av.action||'?'};
+          if(av.action&&oid2){
+            const r=await processQuery(av.action+' '+av.info,oid2);
+            const a=r.answer||r;const acts=r.actions||[];
+            await sendMsg(oid2,a,acts);
+          }
+          res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}));
+        }
+        if(et!=='im.message.receive_v1'){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}))}
         if(seen.has(msg.message_id)){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({code:0}))}seen.add(msg.message_id);
         let text='',imgKey='';try{const c=JSON.parse(msg.content||'{}');text=c.text||'';imgKey=c.image_key||''}catch(e){}
         const oid=((ev.sender||{}).sender_id||(d.sender||{})).open_id||(d.sender||{}).open_id||'';last={et,text:!!text,img:!!imgKey,content:(msg.content||'').substring(0,200)};
-        if(imgKey&&oid){try{last.step='dl';const tk=await getToken();const msgId=msg.message_id||'';const img=await downloadFeishuFile(msgId,imgKey,tk);last.step='got-'+img.data.length;const imgUrl=await serveImage(img.data,img.mime);last.step='url';const desc=await describeImage(imgUrl);last.step='desc';const a=await processQuery('请对这张设计作品进行分析：'+desc,oid);last.imgResult=a.substring(0,100);await sendMsg(oid,a);last.step='ok'}catch(e){last.imgResult='ERR:'+e.message;last.step='fail';await sendMsg(oid,'错误:'+e.message)}}
-        else if(text&&oid){try{last.step='querying';const a=await processQuery(text,oid);last.step='sending';await sendMsg(oid,a);last.step='sent'}catch(e){last.step='err:'+e.message}}
+        if(imgKey&&oid){try{last.step='dl';const tk=await getToken();const msgId=msg.message_id||'';const img=await downloadFeishuFile(msgId,imgKey,tk);last.step='got-'+img.data.length;const imgUrl=await serveImage(img.data,img.mime);last.step='url';const desc=await describeImage(imgUrl);last.step='desc';const r=await processQuery('请对这张设计作品进行分析：'+desc,oid);const a=r.answer||r;const acts=r.actions||[];last.imgResult=a.substring(0,100);await sendMsg(oid,a,acts);last.step='ok'}catch(e){last.imgResult='ERR:'+e.message;last.step='fail';await sendMsg(oid,'错误:'+e.message)}}
+        else if(text&&oid){try{last.step='querying';const r=await processQuery(text,oid);const a=r.answer||r;const acts=r.actions||[];last.step='sending';await sendMsg(oid,a,acts);last.step='sent'}catch(e){last.step='err:'+e.message}}
         res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({code:0}));
       }catch(e){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({code:0}))}
     });return;
