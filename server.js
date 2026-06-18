@@ -67,14 +67,29 @@ async function processQuery(q,chatId){
   if(intent==='compete'&&works.length){ctx+='\n比赛：\n';for(const[k,c]of Object.entries(COMPS))ctx+=`- ${c.name}:概念${c.w.c}% 执行${c.w.e}% 创新${c.w.i}% · ${c.pref}\n`}
   if(intent==='critique')ctx+=THEORY+'\n';
   
-  // Step C: AI narrates
-  // Step C: AI narrates + action buttons
+  // Step C: AI narrates with personality
+  const person=personalities[intent]||personalities.critique;
   const actions=[];
   if(works.length){actions.push({label:'🧬 拆解分析',type:'primary',value:{action:'帮我分析这些作品的设计策略',info:works.map(w=>w.title).join(' ')}});actions.push({label:'💡 出方向',type:'default',value:{action:'基于这个主题给我3个创意方向',info:keywords.join(' ')}});}
   if(designers.length)actions.push({label:'🏆 推荐比赛',type:'default',value:{action:'这些作品适合参加什么比赛',info:designers.map(d=>d.name).join(' ')}});
   actions.push({label:'🧐 审查清单',type:'default',value:{action:'对照设计理论帮我审查',info:intent}});
   
-  const sys=`你是资深设计评论家。请引用匹配结果中的设计师和作品展开分析，可以基于他们的风格延伸建议，但不要编造不存在的具体作品名。语言自然有洞察力，不要说'目前匹配结果中没有更多'这类话。\n${ctx}`;
+  const sys=`${person}\n\n知识库参考：\n${ctx}`;
+  const answer=await askDeepSeek(sys,q,chatId);
+  return {answer,actions:actions.slice(0,3)};
+  
+  const personalities={
+    inspire:`你现在是一个博学的策展人。你见过成千上万的设计作品，一眼就能判断什么值得看。
+说话方式：用"这个让我的联想到..."开头，不说教，像在带人逛设计展。提到任何设计师都随手引用他们一件作品。`,
+    deconstruct:`你现在是设计解剖师。能把任何作品拆到最基本的要素——就像把一块机械表拆成零件摆在桌上。
+说话方式：精确到字号、色值、网格线。用"注意看它的____"开头。不评价好坏，只说事实——但让人感受到你的经验深度。`,
+    direct:`你现在是一个挑衅型的创意教练。你的信念是：安全的设计是看不见的设计，最好的设计一定让某些人不舒服。
+说话方式：给的方向要具体到可以让设计师直接开始执行。不说"可以考虑概念驱动"。说"用施德明的手法：把你最怕失去的设计元素删掉，剩下的是什么？"`,
+    compete:`你现在是一个熟知五大国际设计奖评审内幕的策略师。你知道每个奖项的评审最近三年偏好什么、厌烦什么。
+说话方式：像给一位准备参赛的设计师朋友提供内部建议。会说出"这个作品概念够大胆，但 IFF 不吃这套——投 D&AD 更有机会，因为评审里有两个人在 2024 年选了类似作品"这种话。`,
+    critique:`你现在是五角设计的前设计总监，以严苛著称。你的批评从来不是"挺好的但是..."——你不会说"但是"，你会直接说出问题在哪。
+说话方式：霸道但专业。好的地方一句话带过。差的地方展开讲为什么差。最后一定要给出具体怎么改——不说"改善字体层级"，说"标题从 24px 改成 32px，行距拉开 1.5 倍"。`
+  };
   const answer=await askDeepSeek(sys,q,chatId);
   return {answer,actions:actions.slice(0,3)};
 }
