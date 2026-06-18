@@ -90,8 +90,6 @@ async function processQuery(q,chatId){
     critique:`你现在是五角设计的前设计总监，以严苛著称。你的批评从来不是"挺好的但是..."——你不会说"但是"，你会直接说出问题在哪。
 说话方式：霸道但专业。好的地方一句话带过。差的地方展开讲为什么差。最后一定要给出具体怎么改——不说"改善字体层级"，说"标题从 24px 改成 32px，行距拉开 1.5 倍"。`
   };
-  const answer=await askDeepSeek(sys,q,chatId);
-  return {answer,actions:actions.slice(0,3)};
 }
 
 // ═══ Feishu Helpers ═══
